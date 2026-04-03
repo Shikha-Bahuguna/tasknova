@@ -92,7 +92,9 @@ export default function Chatbot({ tasks=[], subjects=[], onTasksChange }) {
     setLoading(true);
     try{
       const history=[...msgs,userMsg].slice(-14).map(m=>({role:m.role,content:m.content}));
-      const res = await fetch('http://localhost:5000/api/nova/chat', {
+      // const res = await fetch('http://localhost:5000/api/nova/chat', {
+      const res = await fetch('http://tasknova.onrender.com/api/nova/chat', {
+      
   method: 'POST',
   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
   body: JSON.stringify({ system: makeSystem(tasks, subjects), messages: history }),

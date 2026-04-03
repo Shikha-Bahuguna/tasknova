@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import ReminderAlarm from './ReminderAlarm';
 import Chatbot from './Chatbot';
 
-const API = 'http://localhost:5000';
+// const API = 'http://localhost:5000';
+const API = "https://tasknova.onrender.com";
+
 const getToken = () => localStorage.getItem('tasknova_token');
 const getUser  = () => { try { return JSON.parse(localStorage.getItem('tasknova_user')); } catch { return null; } };
 const apiFetch = (path, opts={}) =>
@@ -60,7 +62,7 @@ function AuthScreen({ onAuth }) {
       localStorage.setItem('tasknova_token',d.token);
       localStorage.setItem('tasknova_user',JSON.stringify(d.user));
       onAuth(d.user);
-    }catch{setErr('Cannot connect to server. Make sure the server is running on port 5000.');}
+    }catch{setErr('Cannot connect to server. Please check your internet connection or try again.');}
     finally{setLoad(false);}
   };
   const INP={width:'100%',background:'#13132a',border:'1px solid #ffffff18',borderRadius:10,padding:'11px 14px',color:'#f0efff',fontSize:'.9rem',outline:'none',fontFamily:'inherit'};
