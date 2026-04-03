@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 // const API_BASE = 'http://localhost:5000';
-const API_BASE = "https://tasknova.onrender.com";
+const API_BASE = "https://tasknova-sj9f.onrender.com";
 const getToken = () => localStorage.getItem('tasknova_token');
 const apiFetch = (path, opts={}) =>
   fetch(`${API_BASE}${path}`, {
@@ -93,7 +93,7 @@ export default function Chatbot({ tasks=[], subjects=[], onTasksChange }) {
     try{
       const history=[...msgs,userMsg].slice(-14).map(m=>({role:m.role,content:m.content}));
       // const res = await fetch('http://localhost:5000/api/nova/chat', {
-      const res = await fetch('http://tasknova.onrender.com/api/nova/chat', {
+      const res = await fetch('https://tasknova-sj9f.onrender.com/api/nova/chat', {
       
   method: 'POST',
   headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },

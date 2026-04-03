@@ -3,7 +3,7 @@ import ReminderAlarm from './ReminderAlarm';
 import Chatbot from './Chatbot';
 
 // const API = 'http://localhost:5000';
-const API = "https://tasknova.onrender.com";
+const API = "https://tasknova-sj9f.onrender.com";
 
 const getToken = () => localStorage.getItem('tasknova_token');
 const getUser  = () => { try { return JSON.parse(localStorage.getItem('tasknova_user')); } catch { return null; } };
