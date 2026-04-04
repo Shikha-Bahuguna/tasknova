@@ -1,4 +1,3 @@
-
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -7,9 +6,9 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const { createToken, verifyToken } = require('./auth');
 
-// ── GEMINI AI SETUP ───────────────────────────
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// ── GROQ AI SETUP ─────────────────────────────
+const Groq = require('groq-sdk');
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -151,57 +150,35 @@ app.delete('/api/tasks/:id', (req, res) => {
   res.status(204).send();
 });
 
+// ── ADMIN ROUTES (view in Postman) ────────────
+app.get('/api/admin/users', (req, res) => {
+  const data = readData();
+  const users = (data.users || []).map(({ passwordHash, ...u }) => u);
+  res.json(users);
+});
+
+app.get('/api/admin/tasks', (req, res) => {
+  const data = readData();
+  res.json(data.tasks || []);
+});
+
 // ── AI SUGGESTIONS ────────────────────────────
 app.post('/api/tasks/suggest', (req, res) => {
   const data = readData();
   const subjects = data.subjects || [];
   const subjectTasks = {
-    'Math': [
-      { title: 'Practice calculus problems', priority: 'high' },
-      { title: 'Review algebra fundamentals', priority: 'medium' },
-      { title: 'Complete geometry worksheet', priority: 'medium' },
-    ],
-    'Science': [
-      { title: 'Complete physics lab report', priority: 'high' },
-      { title: 'Review chemistry periodic table', priority: 'medium' },
-      { title: 'Study biology cell structure', priority: 'low' },
-    ],
-    'English': [
-      { title: 'Read assigned chapter', priority: 'high' },
-      { title: 'Write essay outline', priority: 'medium' },
-      { title: 'Review grammar rules', priority: 'low' },
-    ],
-    'History': [
-      { title: 'Read history textbook chapter', priority: 'high' },
-      { title: 'Create timeline of key events', priority: 'medium' },
-      { title: 'Prepare for history quiz', priority: 'high' },
-    ],
-    'Programming': [
-      { title: 'Complete coding challenge', priority: 'high' },
-      { title: 'Review data structures', priority: 'medium' },
-      { title: 'Build small project', priority: 'medium' },
-    ],
+    'Math': [{ title: 'Practice calculus problems', priority: 'high' }, { title: 'Review algebra fundamentals', priority: 'medium' }],
+    'Science': [{ title: 'Complete physics lab report', priority: 'high' }, { title: 'Study biology cell structure', priority: 'low' }],
+    'English': [{ title: 'Read assigned chapter', priority: 'high' }, { title: 'Write essay outline', priority: 'medium' }],
+    'History': [{ title: 'Read history textbook chapter', priority: 'high' }, { title: 'Prepare for history quiz', priority: 'high' }],
+    'Programming': [{ title: 'Complete coding challenge', priority: 'high' }, { title: 'Review data structures', priority: 'medium' }],
   };
-
   let suggestions = [];
   subjects.forEach(subject => {
-    const pool = subjectTasks[subject] || [
-      { title: `Review ${subject} notes`, priority: 'medium' },
-      { title: `Complete ${subject} assignment`, priority: 'high' },
-    ];
+    const pool = subjectTasks[subject] || [{ title: `Review ${subject} notes`, priority: 'medium' }];
     const count = Math.min(2, 5 - suggestions.length);
-    for (let i = 0; i < count && i < pool.length; i++) {
-      suggestions.push({ ...pool[i], subject });
-    }
+    for (let i = 0; i < count && i < pool.length; i++) suggestions.push({ ...pool[i], subject });
   });
-
-  if (suggestions.length < 3) {
-    suggestions.push(
-      { title: 'Organize study notes', subject: subjects[0] || 'General', priority: 'low' },
-      { title: 'Create study schedule', subject: subjects[0] || 'General', priority: 'medium' },
-    );
-  }
-
   res.json({ suggestions: suggestions.slice(0, 5) });
 });
 
@@ -248,7 +225,6 @@ app.get('/api/growth', (req, res) => {
   });
 
   const weeklyTrend = Object.entries(byWeek).sort().slice(-6).map(([week, count]) => ({ week, count }));
-
   res.json({
     totalTasks: tasks.length,
     completedCount: completed.length,
@@ -259,48 +235,36 @@ app.get('/api/growth', (req, res) => {
   });
 });
 
-// ── NOVA AI CHAT ──────────────────────────────
+// ── NOVA AI CHAT (Groq) ───────────────────────
 app.post('/api/nova/chat', async (req, res) => {
   try {
     const { messages, system } = req.body;
-
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    if (!messages || !Array.isArray(messages) || messages.length === 0)
       return res.status(400).json({ error: 'messages array is required' });
-    }
 
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash',
-      systemInstruction: system || 'You are Nova, a helpful AI study assistant for students.',
-    });
-
-    // ✅ FIX: Remove leading assistant messages
-    const filtered = [...messages];
-    while (filtered.length > 0 && filtered[0].role === 'assistant') {
-      filtered.shift();
-    }
-
-    if (filtered.length === 0) {
-      return res.json({ content: [{ text: "Hey! What would you like help with? 😊" }] });
-    }
-
-    const history = filtered.slice(0, -1).map(m => ({
-      role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
+    const groqMessages = messages.map(m => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content,
     }));
 
-    const lastMessage = filtered[filtered.length - 1].content;
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: system || 'You are Nova, a helpful AI study assistant for students.' },
+        ...groqMessages,
+      ],
+      max_tokens: 512,
+      temperature: 0.7,
+    });
 
-    const chat = model.startChat({ history });
-    const result = await chat.sendMessage(lastMessage);
-    const text = result.response.text();
-
+    const text = completion.choices[0]?.message?.content || "Sorry, I couldn't respond right now.";
     res.json({ content: [{ text }] });
-
   } catch (error) {
     console.error('Nova AI Error:', error.message);
     res.status(500).json({ error: 'AI service failed', details: error.message });
   }
 });
+
 // ── ROOT ──────────────────────────────────────
 app.get('/', (req, res) => res.json({ message: 'TaskNova Server Running ✅', port: PORT }));
 
